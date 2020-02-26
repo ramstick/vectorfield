@@ -46,8 +46,14 @@ function updateValues() {
 }
 
 function updateEquation() {
-    document.getElementById("vx-disp").innerHTML += x_equation.toString();
-    document.getElementById("vy-disp").innerHTML += y_equation.toString();
+    document.getElementById("vx-disp").innerHTML = "p.vx = "+x_equation.toString();
+    document.getElementById("vy-disp").innerHTML = "p.vy = "+y_equation.toString();
+}
+
+function randomize(){
+    x_equation = generateRandomEquation(4);
+    y_equation = generateRandomEquation(4);
+    updateEquation();
 }
 
 function main() {
@@ -122,6 +128,7 @@ function main() {
         if (SHOW_VECTORS)
             drawVectorField(canvas, dt);
         then = time;
+        t += dt;
 
         requestAnimationFrame(update);
 
@@ -180,7 +187,6 @@ function drawVectorField(canvas, dt) {
             canvas.fill();
         }
     }
-    t += dt;
 }
 var NUM_PARTICLES = 9999;
 var particles = [];
@@ -192,7 +198,9 @@ function drawParticles(canvas, dt) {
     var transformed_maxY = scaleFunction(SCALE) * maxY + (now_Y - old_Y + off_Y) / 30;
     canvas.fillStyle = "rgb(255,255,255)";
     for (var i = 0; i < particles.length; i++) {
-        canvas.fillRect(map_X(transformed_minX, transformed_maxX, particles[i].x), map_Y(transformed_minY, transformed_maxY, particles[i].y), 1, 1);
+        const x = map_X(transformed_minX, transformed_maxX, particles[i].x)
+        const y = map_Y(transformed_minY, transformed_maxY, particles[i].y);
+        canvas.fillRect(x, y, 1, 1);
         VectorField(particles[i]);
         particles[i].update(dt);
         if (COLOR_BY_VELOCITY) {
@@ -201,7 +209,7 @@ function drawParticles(canvas, dt) {
             canvas.fillStyle = `rgb(${col.r},${col.g},${col.b})`;
         }
         canvas.fill();
-        if (particles[i].life < 0) {
+        if (particles[i].life < 0 || (x < 0 || x > WIDTH) || (y < 0 || y > HEIGHT)) {
             particles[i] = generateParticle();
         }
     }
@@ -264,7 +272,7 @@ function generateParticle() {
 }
 
 function VectorField(p) {
-    const params = [p.x, p.y];
+    const params = [p.x, p.y,t];
     p.vx = x_equation.evaluate(params);
     p.vy = y_equation.evaluate(params);
     return p;
@@ -279,7 +287,7 @@ function map_Y(min, max, old_Y) {
 }
 
 function generateRandomEquation(times) {
-    var function_choice = Math.floor(14 * Math.random());
+    var function_choice = Math.floor(16 * Math.random());
     if (times) {
         if (times <= 1) {
             function_choice = Math.floor(3 * Math.random());
@@ -440,10 +448,19 @@ function generateRandomEquation(times) {
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
-                    return Math.log(e.a.evaluate(param_list));
+                    return Math.abs(Math.log(e.a.evaluate(param_list)));
                 }
                 e.toString = function () {
-                    return `ln(${e.a.toString()})`;
+                    return `ln(|${e.a.toString()}|)`;
+                }
+                return e;
+            case 15:
+                var e = {};
+                e.evaluate = function (param_list) {
+                    return param_list[2];
+                }
+                e.toString = function () {
+                    return `t`;
                 }
                 return e;
         }

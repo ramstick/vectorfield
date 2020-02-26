@@ -12,8 +12,7 @@
         }
         #options{
             position: absolute;
-            width: 400px;
-            height: 600px;
+            min-width: 400px;
             background-color:rgba(2, 2, 34, 0.9);
             padding:10px;
             border: 2px solid rgba(84, 219, 136, 0.4);
@@ -27,7 +26,10 @@
             border: 1px solid rgba(84, 219, 136, 1);
         }
         .sub{
-            color:rgb(84, 219, 197)
+            color:rgb(84, 219, 197);
+        }
+        a:hover{
+            color: rgb(60, 160, 98);
         }
     </style>
 </head>
@@ -58,6 +60,8 @@
         </div>
         <h2 id="vx-disp" class="sub">p.vx = </h2>
         <h2 id="vy-disp" class="sub">p.vy = </h2>
+        <br>
+        <a onclick="randomize();">Generate Random Vector Field</a>
     </div>
 </body>
 
