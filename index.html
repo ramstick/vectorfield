@@ -3,22 +3,31 @@
 
 <head>
     <script src="script.js"></script>
-    <script src="codemirror-5.52.0/lib/codemirror.js"></script>
-    <link rel="stylesheet" href="codemirror-5.52.0/lib/codemirror.css">
-    <script src="codemirror-5.52.0/mode/javascript/javascript.js"></script>
-    <link rel="stylesheet" href="codemirror-5.52.0/theme/dracula.css">
+    <link href="https://fonts.googleapis.com/css?family=Nunito+Sans:200,400&display=swap" rel="stylesheet">
     <style>
         body{
             background-color:black;
+            color: rgba(84, 219, 136, 1);
+            font-family:"Nunito Sans", extra-thin;
         }
         #options{
             position: absolute;
             width: 400px;
             height: 600px;
-            background-color:rgba(2, 2, 34, 0.8);
+            background-color:rgba(2, 2, 34, 0.9);
+            padding:10px;
+            border: 2px solid rgba(84, 219, 136, 0.4);
         }
         canvas{
             position: absolute;
+        }
+        .option{
+            padding: 10px;
+            display: inline;
+            border: 1px solid rgba(84, 219, 136, 1);
+        }
+        .sub{
+            color:rgb(84, 219, 197)
         }
     </style>
 </head>
@@ -26,6 +35,30 @@
 <body onload="main();">
     <canvas id="vector-field-displayer">
     </canvas>
+    <div id="options">
+        <h1>Vector Fields</h1>
+        <input type="checkbox" id="vect-draw">
+        <h4 style="display: inline;">Draw Vectors</h4>
+        <br>
+        <br>
+        <input type="checkbox" id="part-draw" checked>
+        <h4 style="display: inline;">Draw Particles</h4>
+        <br>
+        <br>
+        <h2>Particle Color</h2>
+        <div>
+            <div class="option">
+                <input type="radio" value="Color by Speed" id="speed-col" name="part-col">
+                <label for="Color by Speed">Color by Speed</label>
+            </div>
+            <div class="option">
+                <input type="radio" value="Color Uniformly" id="uniform-col" name="part-col" checked>
+                <label for="Color Uniformly">Color Uniformly</label>
+            </div>
+        </div>
+        <h2 id="vx-disp" class="sub">p.vx = </h2>
+        <h2 id="vy-disp" class="sub">p.vy = </h2>
+    </div>
 </body>
 
 </html>

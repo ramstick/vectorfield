@@ -32,33 +32,70 @@ var FIELD;
 var y_equation;
 var x_equation;
 
+var SHOW_VECTORS = true;
+var SHOW_PARTICLES = true;
+
+var COLOR_BY_VELOCITY = false;
+
+var COLOR_VEL_WEIGHT = 1;
+
+function updateValues() {
+    SHOW_VECTORS = document.getElementById("vect-draw").checked;
+    SHOW_PARTICLES = document.getElementById("part-draw").checked;
+    COLOR_BY_VELOCITY = document.getElementById("speed-col").checked;
+}
+
+function updateEquation() {
+    document.getElementById("vx-disp").innerHTML += x_equation.toString();
+    document.getElementById("vy-disp").innerHTML += y_equation.toString();
+}
+
 function main() {
     var e = document.getElementById("vector-field-displayer");
 
-    document.addEventListener("wheel", function (e) {
+    e.addEventListener("wheel", function (e) {
         SCALE += e.deltaY * 0.01;
         return false;
     });
 
-    x_equation = generateRandomEquation(10);
-    y_equation = generateRandomEquation(10);
+    document.getElementById("vect-draw").addEventListener("change", function () {
+        updateValues();
+    });
+    document.getElementById("part-draw").addEventListener("change", function () {
+        updateValues();
+    });
+    document.getElementById("speed-col").addEventListener("change", function () {
+        updateValues();
+    });
 
-    document.addEventListener("mousedown", function (e) {
+    document.getElementById("uniform-col").addEventListener("change", function () {
+        updateValues();
+    });
+
+    updateValues();
+    x_equation = generateRandomEquation(4);
+    y_equation = generateRandomEquation(4);
+
+    updateEquation();
+
+    e.addEventListener("mousedown", function (e) {
         if (!dragged) {
             old_X = e.clientX;
             old_Y = e.clientY;
+            now_X = e.clientX;
+            now_Y = e.clientY;
             dragged = true;
         }
     });
 
-    document.addEventListener("mousemove", function (e) {
+    e.addEventListener("mousemove", function (e) {
         if (dragged) {
             now_X = e.clientX;
             now_Y = e.clientY;
         }
     })
 
-    document.addEventListener("mouseup", function (e) {
+    e.addEventListener("mouseup", function (e) {
         dragged = false;
         off_X += now_X - old_X;
         off_Y += now_Y - old_Y;
@@ -80,8 +117,10 @@ function main() {
         canvas.beginPath();
         clear(canvas);
         //drawGrid(canvas);
-        drawParticles(canvas, dt);
-        drawVectorField(canvas, dt);
+        if (SHOW_PARTICLES)
+            drawParticles(canvas, dt);
+        if (SHOW_VECTORS)
+            drawVectorField(canvas, dt);
         then = time;
 
         requestAnimationFrame(update);
@@ -91,7 +130,7 @@ function main() {
 }
 
 function clear(canvas) {
-    canvas.fillStyle = "rgb(0,0,0)";
+    canvas.fillStyle = "rgb(73, 189, 191)";
     canvas.globalAlpha = 0.1;
     canvas.fillRect(0, 0, WIDTH, HEIGHT);
     canvas.fill();
@@ -156,6 +195,11 @@ function drawParticles(canvas, dt) {
         canvas.fillRect(map_X(transformed_minX, transformed_maxX, particles[i].x), map_Y(transformed_minY, transformed_maxY, particles[i].y), 1, 1);
         VectorField(particles[i]);
         particles[i].update(dt);
+        if (COLOR_BY_VELOCITY) {
+            const l = Math.sqrt(particles[i].vx * particles[i].vx + particles[i].vy * particles[i].vy);
+            const col = colorIntepolator(l);
+            canvas.fillStyle = `rgb(${col.r},${col.g},${col.b})`;
+        }
         canvas.fill();
         if (particles[i].life < 0) {
             particles[i] = generateParticle();
@@ -170,10 +214,10 @@ function drawParticles(canvas, dt) {
 }
 
 function colorIntepolator(t) {
-    const a = t / MAX_LENGTH;
+    const a = t * COLOR_VEL_WEIGHT;
     return {
-        r: 255 * a,
-        g: 255 * (1 - a),
+        r: 1 * a,
+        g: (255 - a),
         b: 0
     };
 }
@@ -235,9 +279,9 @@ function map_Y(min, max, old_Y) {
 }
 
 function generateRandomEquation(times) {
-    var function_choice = Math.floor(9 * Math.random());
+    var function_choice = Math.floor(14 * Math.random());
     if (times) {
-        if(times <= 1){
+        if (times <= 1) {
             function_choice = Math.floor(3 * Math.random());
         }
         switch (function_choice) {
@@ -246,11 +290,17 @@ function generateRandomEquation(times) {
                 e.evaluate = function (param_list) {
                     return param_list[0];
                 }
+                e.toString = function () {
+                    return "p.x";
+                }
                 return e;
             case 1:
                 var e = {};
                 e.evaluate = function (param_list) {
                     return param_list[1];
+                }
+                e.toString = function () {
+                    return "p.y";
                 }
                 return e;
             case 3:
@@ -258,6 +308,9 @@ function generateRandomEquation(times) {
                 e.a = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
                     return Math.sin(e.a.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `sin(${e.a.toString()})`;
                 }
                 return e;
                 break;
@@ -267,12 +320,18 @@ function generateRandomEquation(times) {
                 e.evaluate = function (param_list) {
                     return Math.cos(e.a.evaluate(param_list));
                 }
+                e.toString = function () {
+                    return `cos(${e.a.toString()})`;
+                }
                 return e;
                 break;
             case 2:
                 var e = {};
                 e.evaluate = function (param_list) {
                     return Math.sqrt(param_list[0] * param_list[0] + param_list[1] * param_list[1]);
+                }
+                e.toString = function () {
+                    return `length(p)`;
                 }
                 return e;
                 break;
@@ -283,6 +342,9 @@ function generateRandomEquation(times) {
                 e.evaluate = function (param_list) {
                     return e.a.evaluate(param_list) + e.b.evaluate(param_list);
                 }
+                e.toString = function () {
+                    return `${e.a.toString()}+${e.b.toString()}`;
+                }
                 return e;
                 break;
             case 6:
@@ -291,6 +353,9 @@ function generateRandomEquation(times) {
                 e.b = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
                     return e.a.evaluate(param_list) - e.b.evaluate(param_list);
+                }
+                e.toString = function () {
+                    return `${e.a.toString()}-${e.b.toString()}`;
                 }
                 return e;
                 break;
@@ -301,6 +366,9 @@ function generateRandomEquation(times) {
                 e.evaluate = function (param_list) {
                     return e.a.evaluate(param_list) * e.b.evaluate(param_list);
                 }
+                e.toString = function () {
+                    return `${e.a.toString()}*${e.b.toString()}`;
+                }
                 return e;
                 break;
             case 8:
@@ -310,89 +378,74 @@ function generateRandomEquation(times) {
                 e.evaluate = function (param_list) {
                     return e.a.evaluate(param_list) / e.b.evaluate(param_list);
                 }
-                return e;
-                break;
-            case 9:
-                break;
-
-        }
-    }else{
-        switch (function_choice) {
-            case 0:
-                var e = {};
-                e.evaluate = function (param_list) {
-                    return param_list[0];
-                }
-                return e;
-            case 1:
-                var e = {};
-                e.evaluate = function (param_list) {
-                    return param_list[1];
-                }
-                return e;
-            case 2:
-                var e = {};
-                e.a = generateRandomEquation();
-                e.evaluate = function (param_list) {
-                    return Math.sin(e.a.evaluate(param_list));
-                }
-                return e;
-                break;
-            case 3:
-                var e = {};
-                e.a = generateRandomEquation();
-                e.evaluate = function (param_list) {
-                    return Math.cos(e.a.evaluate(param_list));
-                }
-                return e;
-                break;
-            case 4:
-                var e = {};
-                e.a = generateRandomEquation();
-                e.evaluate = function (param_list) {
-                    return Math.sqrt(param_list[0] * param_list[0] + param_list[1] * param_list[1]);
-                }
-                return e;
-                break;
-            case 5:
-                var e = {};
-                e.a = generateRandomEquation();
-                e.b = generateRandomEquation();
-                e.evaluate = function (param_list) {
-                    return e.a.evaluate(param_list) + e.b.evaluate(param_list);
-                }
-                return e;
-                break;
-            case 6:
-                var e = {};
-                e.a = generateRandomEquation();
-                e.b = generateRandomEquation();
-                e.evaluate = function (param_list) {
-                    return e.a.evaluate(param_list) - e.b.evaluate(param_list);
-                }
-                return e;
-                break;
-            case 7:
-                var e = {};
-                e.a = generateRandomEquation();
-                e.b = generateRandomEquation();
-                e.evaluate = function (param_list) {
-                    return e.a.evaluate(param_list) * e.b.evaluate(param_list);
-                }
-                return e;
-                break;
-            case 8:
-                var e = {};
-                e.a = generateRandomEquation();
-                e.b = generateRandomEquation();
-                e.evaluate = function (param_list) {
-                    return e.a.evaluate(param_list) / e.b.evaluate(param_list);
+                e.toString = function () {
+                    return `${e.a.toString()}/${e.b.toString()}`;
                 }
                 return e;
                 break;
             case 9:
-                break;
-
+                var e = {};
+                e.a = generateRandomEquation(times - 1);
+                e.evaluate = function (param_list) {
+                    return Math.abs(e.a.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `|${e.a.toString()}|`;
+                }
+                return e;
+            case 10:
+                var e = {};
+                e.a = generateRandomEquation(times - 1);
+                e.b = generateRandomEquation(times - 1);
+                e.evaluate = function (param_list) {
+                    return Math.min(e.a.evaluate(param_list), e.b.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `min(${e.a.toString()}, ${e.b.toString()})`;
+                }
+                return e;
+            case 11:
+                var e = {};
+                e.a = generateRandomEquation(times - 1);
+                e.b = generateRandomEquation(times - 1);
+                e.evaluate = function (param_list) {
+                    return Math.min(e.a.evaluate(param_list), e.b.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `min(${e.a.toString()}, ${e.b.toString()})`;
+                }
+                return e;
+            case 12:
+                var e = {};
+                e.a = generateRandomEquation(times - 1);
+                e.b = generateRandomEquation(times - 1);
+                e.evaluate = function (param_list) {
+                    return Math.max(e.a.evaluate(param_list), e.b.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `max(${e.a.toString()}, ${e.b.toString()})`;
+                }
+                return e;
+            case 13:
+                var e = {};
+                e.a = generateRandomEquation(times - 1);
+                e.evaluate = function (param_list) {
+                    return Math.exp(e.a.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `e<sup>${e.a.toString()}</sup>`;
+                }
+                return e;
+            case 14:
+                var e = {};
+                e.a = generateRandomEquation(times - 1);
+                e.evaluate = function (param_list) {
+                    return Math.log(e.a.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `ln(${e.a.toString()})`;
+                }
+                return e;
         }
     }
 }
