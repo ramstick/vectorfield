@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="script.js"></script>
+    <script src="codemirror-5.52.0/lib/codemirror.js"></script>
+    <link rel="stylesheet" href="codemirror-5.52.0/lib/codemirror.css">
+    <script src="codemirror-5.52.0/mode/javascript/javascript.js"></script>
+    <link rel="stylesheet" href="codemirror-5.52.0/theme/dracula.css">
+    <style>
+        body{
+            background-color:black;
+        }
+        #options{
+            position: absolute;
+            width: 400px;
+            height: 600px;
+            background-color:rgba(2, 2, 34, 0.8);
+        }
+        canvas{
+            position: absolute;
+        }
+    </style>
+</head>
+
+<body onload="main();">
+    <canvas id="vector-field-displayer">
+    </canvas>
+</body>
+
+</html>
