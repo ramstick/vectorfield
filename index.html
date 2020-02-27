@@ -23,6 +23,7 @@
             position: absolute;
             left: 0px;
             top: 0px;
+            background-color: transparent;
         }
         .option{
             padding: 10px;
@@ -49,9 +50,6 @@
             height:80px;
             border: 2px solid rgba(84, 219, 136, 1);
         }
-        .thing{
-            margin: auto 0px;
-        }
         #position-markers{
             color:rgba(255,255,255,1);
         }
@@ -59,8 +57,9 @@
 </head>
 
 <body onload="main();">
-    <canvas id="vector-field-displayer">
-    </canvas>
+    <canvas id="vector-field-displayer-particles"></canvas>
+    <canvas id="vector-field-displayer-vectors"></canvas>
+    <canvas id="vector-field-displayer-overlay"></canvas>
     <div id="options">
         <h1>Vector Fields</h1>
         <input type="checkbox" id="vect-draw">
@@ -69,6 +68,10 @@
         <br>
         <input type="checkbox" id="part-draw" checked>
         <h4 style="display: inline;">Draw Particles</h4>
+        <br>
+        <br>
+        <input type="checkbox" id="part-accel">
+        <h4 style="display: inline;">Acceleration Mode</h4>
         <br>
         <br>
         <h2>Particle Color</h2>
@@ -91,16 +94,13 @@
         <br>
         <label>Number of Particles: </label>
         <input type="number" id="num-part" value="9000" step="1">
-        
-        <div id="position-panel">
-            <input type="number">
-            <div class="row">
-                <input type="number">
-                <input type="number">
-            </div>
-            <input type="number">
-        </div>
-
+        <br>
+        <label>Delta Time: </label>
+        <input type="number" id="dt-sel" value="0.001" step="0.001">
+        <br><br>
+        <a onclick="off_X=0;off_Y=0;">Go to Orgin</a>
+        <br><br>
+        <a onclick="tracing_particles=[];">Clear Tracking</a>
         <br>
         <br>
         <a onclick="randomize();">Generate Random Vector Field</a>
