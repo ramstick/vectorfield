@@ -3,8 +3,6 @@ var canvas;
 var WIDTH = window.innerWidth;
 var HEIGHT = window.innerHeight;
 
-
-
 var minX = -10;
 var maxX = 10;
 var minY = -HEIGHT / WIDTH * (maxX - minX) / 2;
@@ -13,8 +11,8 @@ var maxY = HEIGHT / WIDTH * (maxX - minX) / 2;
 var STEP_X = 1;
 var STEP_Y = 1;
 
-var MAX_LENGTH = Math.sqrt(STEP_X * STEP_X + STEP_Y * STEP_Y) / Math.sqrt(2) * 0.99;
-var LENGTH_SCALING = MAX_LENGTH / 2;
+var MAX_LENGTH = Math.sqrt(STEP_X * STEP_X + STEP_Y * STEP_Y) / Math.sqrt(2) * 0.5;
+var LENGTH_SCALING = 0.9;
 
 var dragged = false;
 var old_X = 0;
@@ -39,10 +37,20 @@ var COLOR_BY_VELOCITY = false;
 
 var COLOR_VEL_WEIGHT = 1;
 
+var t = 0;
+
+var NUM_PARTICLES = 9999;
+var particles = [];
+
 function updateValues() {
     SHOW_VECTORS = document.getElementById("vect-draw").checked;
     SHOW_PARTICLES = document.getElementById("part-draw").checked;
     COLOR_BY_VELOCITY = document.getElementById("speed-col").checked;
+    STEP_X = parseFloat(document.getElementById("Step").value);
+    STEP_Y = STEP_X;
+    MAX_LENGTH = Math.sqrt(STEP_X * STEP_X + STEP_Y * STEP_Y) / Math.sqrt(2) * 0.5;
+    LENGTH_SCALING = 0.9;
+    NUM_PARTICLES = parseInt(document.getElementById("num-part").value);
 }
 
 function updateEquation() {
@@ -54,6 +62,7 @@ function randomize(){
     x_equation = generateRandomEquation(4);
     y_equation = generateRandomEquation(4);
     updateEquation();
+    t = 0;
 }
 
 function main() {
@@ -64,18 +73,21 @@ function main() {
         return false;
     });
 
-    document.getElementById("vect-draw").addEventListener("change", function () {
-        updateValues();
-    });
-    document.getElementById("part-draw").addEventListener("change", function () {
-        updateValues();
-    });
-    document.getElementById("speed-col").addEventListener("change", function () {
-        updateValues();
-    });
+    document.getElementById("vect-draw").addEventListener("change", updateValues);
+    document.getElementById("part-draw").addEventListener("change", updateValues);
+    document.getElementById("speed-col").addEventListener("change", updateValues);
 
-    document.getElementById("uniform-col").addEventListener("change", function () {
-        updateValues();
+    document.getElementById("uniform-col").addEventListener("change", updateValues);
+
+    document.getElementById("Step").addEventListener("change", updateValues);
+    document.getElementById("num-part").addEventListener("change", function(){updateValues(); particles = [];});
+
+    window.addEventListener("resize", function(){
+        WIDTH = document.documentElement.clientWidth;
+        HEIGHT = document.documentElement.clientHeight;
+
+        e.width = WIDTH;
+        e.height = HEIGHT;
     });
 
     updateValues();
@@ -159,9 +171,6 @@ function drawGrid(ctx) {
     ctx.lineTo(map_X(transformed_minX, transformed_maxX, 0), HEIGHT);
     ctx.stroke();
 }
-
-var t = 0;
-
 function drawVectorField(canvas, dt) {
     canvas.fillStyle = "rgb(150,150,255)";
     var transformed_minX = scaleFunction(SCALE) * minX - (now_X - old_X + off_X) / 30;
@@ -188,9 +197,6 @@ function drawVectorField(canvas, dt) {
         }
     }
 }
-var NUM_PARTICLES = 9999;
-var particles = [];
-
 function drawParticles(canvas, dt) {
     var transformed_minX = scaleFunction(SCALE) * minX - (now_X - old_X + off_X) / 30;
     var transformed_minY = scaleFunction(SCALE) * minY + (now_Y - old_Y + off_Y) / 30;
@@ -234,7 +240,7 @@ function lengthInterpolator(l) {
     if (l * LENGTH_SCALING < MAX_LENGTH) {
         return LENGTH_SCALING;
     }
-    return MAX_LENGTH / l;
+    return MAX_LENGTH / l * LENGTH_SCALING;
 }
 
 class Particle {
@@ -258,7 +264,7 @@ class Particle {
 
 function scaleFunction(scale) {
     if (scale < 0) {
-        return Math.exp(scale);
+        return Math.exp(scale+Math.log(0.9)) + 0.1;
     }
     return Math.sqrt(scale + 1);
 }
@@ -287,13 +293,23 @@ function map_Y(min, max, old_Y) {
 }
 
 function generateRandomEquation(times) {
-    var function_choice = Math.floor(16 * Math.random());
+    var function_choice = Math.floor(17 * Math.random());
     if (times) {
         if (times <= 1) {
-            function_choice = Math.floor(3 * Math.random());
+            function_choice = Math.floor(4 * Math.random());
         }
         switch (function_choice) {
             case 0:
+                var e = {};
+                e.a = Math.round((Math.random() * 20 - 10)*10)/10;
+                e.evaluate = function (param_list) {
+                    return e.a;
+                }
+                e.toString = function () {
+                    return `${e.a}`;
+                }
+                return e;
+            case 1:
                 var e = {};
                 e.evaluate = function (param_list) {
                     return param_list[0];
@@ -302,7 +318,7 @@ function generateRandomEquation(times) {
                     return "p.x";
                 }
                 return e;
-            case 1:
+            case 2:
                 var e = {};
                 e.evaluate = function (param_list) {
                     return param_list[1];
@@ -313,6 +329,15 @@ function generateRandomEquation(times) {
                 return e;
             case 3:
                 var e = {};
+                e.evaluate = function (param_list) {
+                    return Math.sqrt(param_list[0] * param_list[0] + param_list[1] * param_list[1]);
+                }
+                e.toString = function () {
+                    return `length(p)`;
+                }
+                return e;
+            case 4:
+                var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
                     return Math.sin(e.a.evaluate(param_list));
@@ -321,8 +346,7 @@ function generateRandomEquation(times) {
                     return `sin(${e.a.toString()})`;
                 }
                 return e;
-                break;
-            case 4:
+            case 5:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
@@ -332,18 +356,7 @@ function generateRandomEquation(times) {
                     return `cos(${e.a.toString()})`;
                 }
                 return e;
-                break;
-            case 2:
-                var e = {};
-                e.evaluate = function (param_list) {
-                    return Math.sqrt(param_list[0] * param_list[0] + param_list[1] * param_list[1]);
-                }
-                e.toString = function () {
-                    return `length(p)`;
-                }
-                return e;
-                break;
-            case 5:
+            case 6:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.b = generateRandomEquation(times - 1);
@@ -355,7 +368,7 @@ function generateRandomEquation(times) {
                 }
                 return e;
                 break;
-            case 6:
+            case 7:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.b = generateRandomEquation(times - 1);
@@ -367,7 +380,7 @@ function generateRandomEquation(times) {
                 }
                 return e;
                 break;
-            case 7:
+            case 8:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.b = generateRandomEquation(times - 1);
@@ -379,7 +392,7 @@ function generateRandomEquation(times) {
                 }
                 return e;
                 break;
-            case 8:
+            case 9:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.b = generateRandomEquation(times - 1);
@@ -391,7 +404,7 @@ function generateRandomEquation(times) {
                 }
                 return e;
                 break;
-            case 9:
+            case 10:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
@@ -399,17 +412,6 @@ function generateRandomEquation(times) {
                 }
                 e.toString = function () {
                     return `|${e.a.toString()}|`;
-                }
-                return e;
-            case 10:
-                var e = {};
-                e.a = generateRandomEquation(times - 1);
-                e.b = generateRandomEquation(times - 1);
-                e.evaluate = function (param_list) {
-                    return Math.min(e.a.evaluate(param_list), e.b.evaluate(param_list));
-                }
-                e.toString = function () {
-                    return `min(${e.a.toString()}, ${e.b.toString()})`;
                 }
                 return e;
             case 11:
@@ -428,13 +430,24 @@ function generateRandomEquation(times) {
                 e.a = generateRandomEquation(times - 1);
                 e.b = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
+                    return Math.min(e.a.evaluate(param_list), e.b.evaluate(param_list));
+                }
+                e.toString = function () {
+                    return `min(${e.a.toString()}, ${e.b.toString()})`;
+                }
+                return e;
+            case 13:
+                var e = {};
+                e.a = generateRandomEquation(times - 1);
+                e.b = generateRandomEquation(times - 1);
+                e.evaluate = function (param_list) {
                     return Math.max(e.a.evaluate(param_list), e.b.evaluate(param_list));
                 }
                 e.toString = function () {
                     return `max(${e.a.toString()}, ${e.b.toString()})`;
                 }
                 return e;
-            case 13:
+            case 14:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
@@ -444,17 +457,17 @@ function generateRandomEquation(times) {
                     return `e<sup>${e.a.toString()}</sup>`;
                 }
                 return e;
-            case 14:
+            case 15:
                 var e = {};
                 e.a = generateRandomEquation(times - 1);
                 e.evaluate = function (param_list) {
-                    return Math.abs(Math.log(e.a.evaluate(param_list)));
+                    return Math.log(Math.abs(e.a.evaluate(param_list)));
                 }
                 e.toString = function () {
                     return `ln(|${e.a.toString()}|)`;
                 }
                 return e;
-            case 15:
+            case 16:
                 var e = {};
                 e.evaluate = function (param_list) {
                     return param_list[2];
