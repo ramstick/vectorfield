@@ -735,11 +735,22 @@ function RENDER_DIVERGENCE_BACKGROUND(){
     }
     return false;
 }
+
+function CURL_COL_INTER(curl){
+    curl = 1 / (1+Math.exp(-10*curl));
+    var inv = 1-curl;
+    return {
+        r: 56 * inv + curl * 196,
+        g: 224 * inv + curl * 56,
+        b: 242 * inv + curl * 242,
+    };
+}
+
 function RENDER_CURL_BACKGROUND(){
     if(FINISHED_RENDERING_BACKGROUND){
         return true;
     }
-    const du = 0.001;
+    const du = 0.00001;
     var transformed_minX = scaleFunction(SCALE) * minX - (now_X - old_X + off_X) / 30;
     var transformed_minY = scaleFunction(SCALE) * minY + (now_Y - old_Y + off_Y) / 30;
     var transformed_maxX = scaleFunction(SCALE) * maxX - (now_X - old_X + off_X) / 30;
@@ -758,9 +769,9 @@ function RENDER_CURL_BACKGROUND(){
                 var dXOP = [mappedX+du,mappedY,t];
                 var dYOP = [mappedX,mappedY+du,t];
                 var c1 =[mappedX,mappedY,t];
-                var dx = (x_equation.evaluate(dYOP) - x_equation.evaluate(c1)) / du;
-                var dy = (y_equation.evaluate(dXOP) - y_equation.evaluate(c1)) / du;
-                var col = DIV_COL_INTER(dx-dy);
+                var dx = (y_equation.evaluate(dXOP) - x_equation.evaluate(c1)) / du;
+                var dy = (x_equation.evaluate(dYOP) - y_equation.evaluate(c1)) / du;
+                var col = CURL_COL_INTER(dx-dy);
     
                 var i = y * (WIDTH * 4) + x * 4;
                 backdrop.data[i] = col.r;
