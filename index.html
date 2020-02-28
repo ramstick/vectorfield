@@ -57,6 +57,7 @@
 </head>
 
 <body onload="main();">
+    <canvas id="vector-field-displayer-background"></canvas>
     <canvas id="vector-field-displayer-particles"></canvas>
     <canvas id="vector-field-displayer-vectors"></canvas>
     <canvas id="vector-field-displayer-overlay"></canvas>
@@ -66,12 +67,16 @@
         <h4 style="display: inline;">Draw Vectors</h4>
         <br>
         <br>
-        <input type="checkbox" id="part-draw" checked>
+        <input type="checkbox" id="part-draw">
         <h4 style="display: inline;">Draw Particles</h4>
         <br>
         <br>
         <input type="checkbox" id="part-accel">
         <h4 style="display: inline;">Acceleration Mode</h4>
+        <br>
+        <br>
+        <input type="checkbox" id="div-sel" checked>
+        <h4 style="display: inline;">Divergence Mode</h4>
         <br>
         <br>
         <h2>Particle Color</h2>
@@ -93,7 +98,7 @@
         <input type="number" id="Step" placeholder="Step" value="1" step="0.1">
         <br>
         <label>Number of Particles: </label>
-        <input type="number" id="num-part" value="9000" step="1">
+        <input type="number" id="num-part" value="900" step="1">
         <br>
         <label>Delta Time: </label>
         <input type="number" id="dt-sel" value="0.001" step="0.001">
@@ -106,6 +111,10 @@
         <a onclick="randomize();">Generate Random Vector Field</a>
         <br>
         <a onclick="t = 0;">Reset Time</a>
+        <br>
+        <small>FPS:</small>
+        <br>
+        <small id="f-count"></small>
     </div>
     <div>
         <h2 id="position-markers">0.00</h2>

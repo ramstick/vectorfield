@@ -1,3 +1,4 @@
+var background_canvas;
 var vectors_canvas;
 var particles_canvas;
 var overlay_canvas;
@@ -57,20 +58,39 @@ var tracing = false;
 var tracing_particles = [];
 
 var FULL_CLEAR = false;
+var RERENDER_VECTORS = false;
 
 var DT_MULT = 0.01;
+
+var BG_COL = "rgb(73, 189, 191)";
+
+var backdrop, backdrop_A;
+var CURR_OFFSET_X = 0;
+var CURR_OFFSET_Y = 0;
+var FINISHED_RENDERING_BACKGROUND = false;
+var SEGMENTS_TO_RENDER = 8;
+
+var RENDERING_DIVERGENCE = false;
+
+var LAST_FRAME;
+
+var FRAME_COUNT_E;
 
 function updateValues() {
     SHOW_VECTORS = document.getElementById("vect-draw").checked;
     SHOW_PARTICLES = document.getElementById("part-draw").checked;
     COLOR_BY_VELOCITY = document.getElementById("speed-col").checked;
     ACCEL_MODE = document.getElementById("part-accel").checked;
+    RENDERING_DIVERGENCE = document.getElementById("div-sel").checked;
     STEP_X = parseFloat(document.getElementById("Step").value);
     STEP_Y = STEP_X;
     MAX_LENGTH = Math.sqrt(STEP_X * STEP_X + STEP_Y * STEP_Y) / Math.sqrt(2) * 0.5;
     LENGTH_SCALING = 0.9;
     NUM_PARTICLES = parseInt(document.getElementById("num-part").value);
     DT_MULT = parseFloat(document.getElementById("dt-sel").value);
+    if(vectors_canvas)
+        vectors_canvas.clearRect(0,0,WIDTH,HEIGHT);
+    RERENDER_VECTORS = true;
 }
 
 function updateEquation() {
@@ -83,20 +103,23 @@ function randomize() {
     y_equation = generateRandomEquation(4);
     updateEquation();
     t = 0;
+    RERENDER_VECTORS = true;
+    RERENDER_BACKGROUND();
 }
 
 
 function MOUSE_DOWN(e) {
+    
     if (!dragged && e.buttons & 0x1 == 1) {
         old_X = e.clientX;
         old_Y = e.clientY;
         now_X = e.clientX;
         now_Y = e.clientY;
         dragged = true;
+        MAX_INTERLACE = 16;
+        FINISHED_RENDERING_BACKGROUND = false;
     }
-    console.log(e.buttons);
     if ((e.buttons & 2) == 2) {
-        console.log("EE");
         old_X_generate = e.clientX;
         old_Y_generate = e.clientY;
         new_X_generate = e.clientX;
@@ -110,9 +133,10 @@ function MOUSE_MOVE(e) {
         now_X = e.clientX;
         now_Y = e.clientY;
         FULL_CLEAR = true;
+        RERENDER_BACKGROUND();
+        FINISHED_RENDERING_BACKGROUND = false;
     }
     if (tracing) {
-        console.log("ye");
         new_X_generate = e.clientX;
         new_Y_generate = e.clientY;
     }
@@ -120,7 +144,6 @@ function MOUSE_MOVE(e) {
 
 function MOUSE_UP(e) {
     if (tracing) {
-        console.log("kjfdas")
         var transformed_minX = scaleFunction(SCALE) * minX - (now_X - old_X + off_X) / 30;
         var transformed_minY = scaleFunction(SCALE) * minY + (now_Y - old_Y + off_Y) / 30;
         var transformed_maxX = scaleFunction(SCALE) * maxX - (now_X - old_X + off_X) / 30;
@@ -140,25 +163,27 @@ function MOUSE_UP(e) {
             newY = t;
         }
         tracing_particles = [];
-        console.log(oldX + " " + newX + "   :   " + old_X_generate + " " + new_X_generate);
-        console.log(oldY + " " + newY + "   :   " + old_Y_generate + " " + new_Y_generate);
-        for (var x = oldX; x < newX; x += (newX-oldX)/ 50) {
-            for (var y = oldY; y < newY; y += (newY-oldY)/ 50) {
+        for (var x = oldX; x < newX; x += (newX-oldX)/ 100) {
+            for (var y = oldY; y < newY; y += (newY-oldY)/ 100) {
                 tracing_particles.push(new Particle(x, y));
             }
         }
+        old_X_generate = 0;
+        old_Y_generate = 0;
+        new_X_generate = 0;
+        new_Y_generate = 0;
+    }
+    if(dragged){
+        off_X += now_X - old_X;
+        off_Y += now_Y - old_Y;
+        old_X = 0;
+        old_Y = 0;
+        now_X = 0;
+        now_Y = 0;
+        MAX_INTERLACE = INTERLACING_ALGORITHM.length;
+        FINISHED_RENDERING_BACKGROUND = false;
     }
     dragged = false;
-    off_X += now_X - old_X;
-    off_Y += now_Y - old_Y;
-    old_X = 0;
-    old_Y = 0;
-    now_X = 0;
-    now_Y = 0;
-    old_X_generate = 0;
-    old_Y_generate = 0;
-    new_X_generate = 0;
-    new_Y_generate = 0;
     tracing = false;
 }
 
@@ -166,6 +191,8 @@ function RECALCULATE_CANVAS_SIZE(e) {
     WIDTH = document.documentElement.clientWidth;
     HEIGHT = document.documentElement.clientHeight;
 
+    document.getElementById("vector-field-displayer-background").width = WIDTH;
+    document.getElementById("vector-field-displayer-background").height = HEIGHT;
     document.getElementById("vector-field-displayer-vectors").width = WIDTH;
     document.getElementById("vector-field-displayer-vectors").height = HEIGHT;
     document.getElementById("vector-field-displayer-particles").width = WIDTH;
@@ -178,22 +205,23 @@ function main() {
     var e = document.getElementById("vector-field-displayer-vectors");
     var e2 = document.getElementById("vector-field-displayer-particles");
     var e3 = document.getElementById("vector-field-displayer-overlay");
+    FRAME_COUNT_E = document.getElementById("f-count");
 
     // Attaching event Listeners
     e3.addEventListener("wheel", function (e) {
         SCALE += e.deltaY * 0.01;
+        FULL_CLEAR = true;
+        RERENDER_BACKGROUND();
     });
     document.getElementById("vect-draw").addEventListener("change", updateValues);
-    document.getElementById("part-draw").addEventListener("change", updateValues);
-    document.getElementById("speed-col").addEventListener("change", updateValues);
-    document.getElementById("uniform-col").addEventListener("change", updateValues);
-    document.getElementById("part-accel").addEventListener("change", updateValues);
+    document.getElementById("part-draw").addEventListener("change",function() {updateValues(), FULL_CLEAR = true});
+    document.getElementById("speed-col").addEventListener("change", function() {updateValues(), FULL_CLEAR = true});
+    document.getElementById("uniform-col").addEventListener("change", function() {updateValues(), FULL_CLEAR = true});
+    document.getElementById("part-accel").addEventListener("change", function() {updateValues(), FULL_CLEAR = true});
     document.getElementById("Step").addEventListener("change", updateValues);
-    document.getElementById("num-part").addEventListener("change", function () {
-        updateValues();
-        particles = [];
-    });
+    document.getElementById("num-part").addEventListener("change", function() {updateValues(), FULL_CLEAR = true; particles = []});
     document.getElementById("dt-sel").addEventListener("change", updateValues);
+    document.getElementById("div-sel").addEventListener("change", function() {updateValues(); RERENDER_BACKGROUND();});
     window.addEventListener("resize", RECALCULATE_CANVAS_SIZE);
 
     // Attach Mouse Listeners
@@ -213,23 +241,38 @@ function main() {
     vectors_canvas = e.getContext("2d");
     particles_canvas = e2.getContext("2d");
     overlay_canvas = e3.getContext("2d");
+    background_canvas = document.getElementById("vector-field-displayer-background").getContext("2d", {alpha : false});
+    CLEAR_BACKGROUND();
+    RENDER_DIVERGENCE_BACKGROUND();
 
     var then = 0;
 
     function update(time) {
         const dt = (time - then) * DT_MULT;
+        clear(particles_canvas)
+        if(!FINISHED_RENDERING_BACKGROUND){
+            if(RENDER_BACKGROUND()){
+                FINISHED_RENDERING_BACKGROUND = true;
+            }
+        }
         if (FULL_CLEAR) {
-            clear(particles_canvas, 1);
+            //CLEAR_BACKGROUND();
             FULL_CLEAR = false;
-        } else {
-            clear(particles_canvas, 0.1);
+            if (SHOW_VECTORS) {
+                drawVectorField(vectors_canvas, dt);
+            }
+        }
+        if(RERENDER_VECTORS){
+            RERENDER_VECTORS = false;
+            if (SHOW_VECTORS) {
+                drawVectorField(vectors_canvas, dt);
+            }
+
         }
         if (SHOW_PARTICLES) {
             drawParticles(particles_canvas, dt);
         }
-        if (SHOW_VECTORS) {
-            drawVectorField(vectors_canvas, dt);
-        }
+
         overlay_canvas.clearRect(0, 0, WIDTH, HEIGHT);
 
         if (tracing) {
@@ -237,6 +280,8 @@ function main() {
             overlay_canvas.strokeRect(old_X_generate, old_Y_generate, new_X_generate - old_X_generate, new_Y_generate - old_Y_generate);
             overlay_canvas.stroke();
         }
+
+        FRAME_COUNT_E.innerHTML = Math.round(1/dt);
 
         then = time;
         t += dt;
@@ -248,12 +293,7 @@ function main() {
 }
 
 function clear(canvas, alpha) {
-    canvas.beginPath();
-    canvas.fillStyle = "rgb(73, 189, 191)";
-    canvas.globalAlpha = alpha;
-    canvas.fillRect(0, 0, WIDTH, HEIGHT);
-    canvas.fill();
-    canvas.globalAlpha = 1.0;
+    canvas.clearRect(0,0,WIDTH,HEIGHT);
 }
 
 function drawVectorField(canvas, dt) {
@@ -602,4 +642,145 @@ function generateRandomEquation(times) {
                 return e;
         }
     }
+}
+
+function DIV_COL_INTER(div){
+    div = 1 / (1 + Math.exp(-div));
+    var inv = 1-div;
+    return {
+        r: 56 * inv + div * 196,
+        g: 224 * inv + div * 56,
+        b: 242 * inv + div * 242,
+    };
+}
+function CLEAR_BACKGROUND(){
+    CURR_OFFSET_X = 0;
+    CURR_OFFSET_Y = 0;
+    CURR_INTERLACING = 0;
+    FINISHED_RENDERING_BACKGROUND = false;
+    backdrop = vectors_canvas.createImageData(WIDTH,HEIGHT);
+    backdrop_A = vectors_canvas.createImageData(WIDTH,HEIGHT);
+}
+
+function RENDER_BACKGROUND(){
+    if(RENDERING_DIVERGENCE){
+        return RENDER_DIVERGENCE_BACKGROUND();
+    }else{
+        return RENDER_CURL_BACKGROUND();
+    }
+}
+var CURR_INTERLACING = 0;
+var INTERLACING_ALGORITHM = [
+    [{x:0,y:0}],
+    [{x:4, y:0},{x:7,y:1}],
+    [{x:0,y:4},{x:4,y:4}],
+    [{x:2,y:0},{x:6,y:0}],[{x:2,y:4},{x:6,y:4}],
+    [{x:0,y:2},{x:2,y:2}],[{x:4,y:2},{x:6,y:2}],
+    [{x:0,y:6},{x:2,y:6}],[{x:4,y:6},{x:6,y:6}],
+    [{x:1,y:0},{x:3,y:0}],[{x:5,y:0},{x:7,y:0}],
+    [{x:1,y:2},{x:3,y:2}],[{x:5,y:2},{x:7,y:2}],
+    [{x:1,y:4},{x:3,y:4}],[{x:5,y:4},{x:7,y:4}],
+    [{x:1,y:6},{x:3,y:6}],[{x:5,y:6},{x:7,y:6}],
+    [{x:0,y:1},{x:1,y:1}],[{x:2,y:1},{x:3,y:1}],
+    [{x:4,y:1},{x:5,y:1}],[{x:6,y:1},{x:7,y:3}],
+    [{x:0,y:3},{x:1,y:3}],[{x:2,y:3},{x:3,y:3}],
+    [{x:4,y:3},{x:5,y:3}],[{x:6,y:3},{x:7,y:3}],
+    [{x:0,y:5},{x:1,y:5}],[{x:2,y:5},{x:3,y:5}],
+    [{x:4,y:5},{x:5,y:5}],[{x:6,y:5},{x:7,y:5}],
+    [{x:0,y:7},{x:1,y:7}],[{x:2,y:7},{x:3,y:7}],
+    [{x:4,y:7},{x:5,y:7}],[{x:6,y:7},{x:7,y:7}],
+];
+var MAX_INTERLACE = INTERLACING_ALGORITHM.length;
+
+function RENDER_DIVERGENCE_BACKGROUND(){
+    if(FINISHED_RENDERING_BACKGROUND){
+        return true;
+    }
+    const du = 0.001;
+    var transformed_minX = scaleFunction(SCALE) * minX - (now_X - old_X + off_X) / 30;
+    var transformed_minY = scaleFunction(SCALE) * minY + (now_Y - old_Y + off_Y) / 30;
+    var transformed_maxX = scaleFunction(SCALE) * maxX - (now_X - old_X + off_X) / 30;
+    var transformed_maxY = scaleFunction(SCALE) * maxY + (now_Y - old_Y + off_Y) / 30;
+    var e = (transformed_maxX - transformed_minX) / WIDTH;
+    var e2 = (transformed_maxY - transformed_minY) / HEIGHT;
+    var curr_inter = INTERLACING_ALGORITHM[CURR_INTERLACING];
+    if(!curr_inter){
+        return true;
+    }
+    for(var j = 0; j < curr_inter.length; j ++){
+        for(var x = curr_inter[j].x; x < WIDTH; x += SEGMENTS_TO_RENDER){
+            for(var y = curr_inter[j].y; y < HEIGHT; y += SEGMENTS_TO_RENDER){
+                var mappedX = x * e + transformed_minX;
+                var mappedY = (HEIGHT - y) * e2 + transformed_minY;
+                var dXOP = [mappedX+du,mappedY,t];
+                var dYOP = [mappedX,mappedY+du,t];
+                var c1 =[mappedX,mappedY,t];
+                var dx = (x_equation.evaluate(dXOP) - x_equation.evaluate(c1)) / du;
+                var dy = (y_equation.evaluate(dYOP) - y_equation.evaluate(c1)) / du;
+                var col = DIV_COL_INTER(dx+dy);
+    
+                var i = y * (WIDTH * 4) + x * 4;
+                backdrop.data[i] = col.r;
+                backdrop.data[i+1] = col.g;
+                backdrop.data[i+2] = col.b;
+                backdrop.data[i+3] = 255;
+            }
+        }
+    }
+    background_canvas.putImageData(backdrop,0,0);
+
+    CURR_INTERLACING ++;
+    if(CURR_INTERLACING >= MAX_INTERLACE){
+        return true;
+    }
+    return false;
+}
+function RENDER_CURL_BACKGROUND(){
+    if(FINISHED_RENDERING_BACKGROUND){
+        return true;
+    }
+    const du = 0.001;
+    var transformed_minX = scaleFunction(SCALE) * minX - (now_X - old_X + off_X) / 30;
+    var transformed_minY = scaleFunction(SCALE) * minY + (now_Y - old_Y + off_Y) / 30;
+    var transformed_maxX = scaleFunction(SCALE) * maxX - (now_X - old_X + off_X) / 30;
+    var transformed_maxY = scaleFunction(SCALE) * maxY + (now_Y - old_Y + off_Y) / 30;
+    var e = (transformed_maxX - transformed_minX) / WIDTH;
+    var e2 = (transformed_maxY - transformed_minY) / HEIGHT;
+    var curr_inter = INTERLACING_ALGORITHM[CURR_INTERLACING];
+    if(!curr_inter){
+        return true;
+    }
+    for(var j = 0; j < curr_inter.length; j ++){
+        for(var x = curr_inter[j].x; x < WIDTH; x += SEGMENTS_TO_RENDER){
+            for(var y = curr_inter[j].y; y < HEIGHT; y += SEGMENTS_TO_RENDER){
+                var mappedX = x * e + transformed_minX;
+                var mappedY = (HEIGHT - y) * e2 + transformed_minY;
+                var dXOP = [mappedX+du,mappedY,t];
+                var dYOP = [mappedX,mappedY+du,t];
+                var c1 =[mappedX,mappedY,t];
+                var dx = (x_equation.evaluate(dYOP) - x_equation.evaluate(c1)) / du;
+                var dy = (y_equation.evaluate(dXOP) - y_equation.evaluate(c1)) / du;
+                var col = DIV_COL_INTER(dx-dy);
+    
+                var i = y * (WIDTH * 4) + x * 4;
+                backdrop.data[i] = col.r;
+                backdrop.data[i+1] = col.g;
+                backdrop.data[i+2] = col.b;
+                backdrop.data[i+3] = 255;
+            }
+        }
+    }
+    background_canvas.putImageData(backdrop,0,0);
+
+    CURR_INTERLACING ++;
+    if(CURR_INTERLACING >= MAX_INTERLACE){
+        return true;
+    }
+    return false;
+}
+function RERENDER_BACKGROUND(){
+    FINISHED_RENDERING_BACKGROUND = false;
+    CURR_OFFSET_X = 0;
+    CURR_OFFSET_Y = 0;
+    CURR_INTERLACING = 0;
 }
